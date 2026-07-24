@@ -1,6 +1,6 @@
 # element_hud
 
-![Alt Text]([URL](https://i.imgur.com/kmxvZa5.png))
+([URL](https://i.imgur.com/kmxvZa5.png))
 
 The HUD is not perfertly written as it was abit rushed.
 
