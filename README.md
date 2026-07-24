@@ -1,4 +1,5 @@
 # element_hud
+The HUD is not perfertly written as it was abit rushed.
 
 A modern and configurable HUD resource for FiveM, built for both **QBox** and **QBCore**. (Please use QBOX🙏)
 
