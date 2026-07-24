@@ -1,6 +1,6 @@
 # element_hud
 
-A modern and configurable HUD resource for FiveM, built for both **QBox** and **QBCore**.
+A modern and configurable HUD resource for FiveM, built for both **QBox** and **QBCore**. (Please use QBOX🙏)
 
 `element_hud` provides separate interfaces for player information, vehicles and helicopters, together with persistent player settings stored through FiveM KVP.
 
