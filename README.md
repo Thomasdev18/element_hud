@@ -132,7 +132,7 @@ Optional integrations:
 1. Download or clone the repository.
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/element_hud.git
+git clone https://github.com/Thomasdev18/element_hud.git
 ````
 
 2. Place the resource inside your server resources directory.
