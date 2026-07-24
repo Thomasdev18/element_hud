@@ -1,5 +1,16 @@
 # element_hud
-[URL](https://i.imgur.com/kmxvZa5.png)
+
+<p align="center">
+  <img
+    src="https://i.imgur.com/kmxvZa5.png"
+    alt="Element HUD"
+    width="100%"
+  />
+</p>
+
+<p align="center">
+  A modern and configurable HUD resource for FiveM, built for QBox and QBCore.
+</p>
 
 The HUD is not perfertly written as it was abit rushed.
 
