@@ -21,8 +21,8 @@
 
 ---
 
-> This project is **source available**, not open source under an OSI-approved licence.  
-> You may use and modify the resource, but redistribution and resale are prohibited.
+This project is **source available**, not open source under an OSI-approved licence.  
+You may use and modify the resource, but redistribution and resale are prohibited.
 
 ## Features
 
