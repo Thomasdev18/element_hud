@@ -12,13 +12,6 @@
   A modern and configurable HUD resource for FiveM, built for QBox and QBCore.
 </p>
 
-The HUD is not perfertly written as it was abit rushed.
-
-A modern and configurable HUD resource for FiveM, built for both **QBox** and **QBCore**. (Please use QBOX🙏)
-
-`element_hud` provides separate interfaces for player information, vehicles and helicopters, together with persistent player settings stored through FiveM KVP.
-
-
 > This project is **source available**, not open source under an OSI-approved licence.  
 > You may use and modify the resource, but redistribution and resale are prohibited.
 
