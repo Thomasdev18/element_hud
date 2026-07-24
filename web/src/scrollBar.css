@@ -1,0 +1,28 @@
+
+::-webkit-scrollbar {
+  width: 2px;
+  height: 6px;
+}
+
+
+/* Track */
+::-webkit-scrollbar-track {
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-dark-9); 
+  margin-left:40px;
+  margin-right:40px;
+  margin-top:40px;
+  margin-bottom:40px;
+}
+ 
+/* Handle */
+::-webkit-scrollbar-thumb {
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-primary-color-9); 
+  cursor:pointer;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mantine-primary-color-7); 
+}

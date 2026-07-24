@@ -1,0 +1,51 @@
+@font-face {
+  font-family: 'Nexa-Book';
+  src: url('./fonts/Nexa-Book.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'digital-7';
+  src: url('./fonts/digital-7.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Tussilago';
+  src: url('./fonts/tussilagohv-regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+
+html {
+  color-scheme: normal !important;
+}
+
+body {
+  margin: 0;
+  background: none !important;
+  overflow: hidden !important;
+  font-family: 'Tussilago', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100vh;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+#root {
+  background: none !important;
+  overflow-y: hidden !important;
+  height: 100%
+}
+
+code {
+
+  overflow: hidden;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
