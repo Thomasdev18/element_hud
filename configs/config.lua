@@ -4,8 +4,8 @@ return {
     useMPH = true,
     useWeaponHud = true,
     hudSettings = {
-        enabled = true,
-        defaultHUDSettings = {
+        enabled = true, -- NOT YET DONE
+        defaultHUDSettings = { -- THIS WORKS
             hudDisabled = false,
             cinematicBarsHeight = 0,
             playerStatusIndicator = 'square',
