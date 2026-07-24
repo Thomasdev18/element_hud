@@ -11,18 +11,35 @@ import { useNuiEvent } from "../../hooks/useNuiEvent";
 import { compassStore } from "../../stores/stats";
 import {
   settingsStore,
-  type CompassHudStyle,
-  type CompassPosition,
-  type PlayerHudPosition,
-  type PlayerStatusIndicator,
+  type CompassHudLayout,
+  type PlayerHudLayout,
 } from "../../stores/settings";
-import { CompassStore } from "../../typings/stats";
+import type { CompassStore } from "../../typings/stats";
 
-const compassDirections = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+const COMPASS_DIRECTIONS = [
+  "N",
+  "NE",
+  "E",
+  "SE",
+  "S",
+  "SW",
+  "W",
+  "NW",
+] as const;
+
+type CompassDirection = (typeof COMPASS_DIRECTIONS)[number];
+
+const BOTTOM_PLAYER_HUD_CLEARANCE: Record<PlayerHudLayout, string> = {
+  icons: "6.5vh",
+  minimal: "7.5vh",
+  circular: "6.8vh",
+};
 
 function getCompactDirection(direction?: string) {
   const normalizedDirection = (direction || "N").toUpperCase();
-  const index = compassDirections.indexOf(normalizedDirection);
+  const index = COMPASS_DIRECTIONS.indexOf(
+    normalizedDirection as CompassDirection,
+  );
 
   if (index === -1) {
     return {
@@ -34,41 +51,37 @@ function getCompactDirection(direction?: string) {
 
   return {
     previous:
-      compassDirections[
-        (index - 1 + compassDirections.length) % compassDirections.length
+      COMPASS_DIRECTIONS[
+        (index - 1 + COMPASS_DIRECTIONS.length) %
+          COMPASS_DIRECTIONS.length
       ],
-    current: compassDirections[index],
-    next: compassDirections[(index + 1) % compassDirections.length],
+    current: COMPASS_DIRECTIONS[index],
+    next: COMPASS_DIRECTIONS[(index + 1) % COMPASS_DIRECTIONS.length],
   };
 }
 
-function getBottomPlayerHudClearance(indicator: PlayerStatusIndicator) {
-  if (indicator === "segmented" || indicator === "segmented-bar") {
-    return "10.5vh";
-  }
-
-  if (indicator === "bar") {
-    return "7.5vh";
-  }
-
-  return "6.5vh";
+function getBottomPlayerHudClearance(layout: PlayerHudLayout) {
+  return BOTTOM_PLAYER_HUD_CLEARANCE[layout];
 }
 
 export const Compass = () => {
   const theme = useMantineTheme();
   const { open, currentStreet, nextStreet, direction, zone } = compassStore();
 
-  const compassStyle = settingsStore(
-    (state) => state.compassStyle ?? "default",
-  ) as CompassHudStyle;
+  const compassLayout = settingsStore(
+    (state) => state.compass.layout,
+  ) as CompassHudLayout;
+
   const compassPosition = settingsStore(
-    (state) => state.compassPosition ?? "top-center",
-  ) as CompassPosition;
-  const playerHudPosition = settingsStore(
-    (state) => state.playerHudPosition ?? "bottom-left",
-  ) as PlayerHudPosition;
-  const playerStatusIndicator = settingsStore(
-    (state) => state.playerStatusIndicator,
+    (state) => state.compass.position,
+  );
+
+  const playerLayout = settingsStore(
+    (state) => state.player.layout,
+  ) as PlayerHudLayout;
+
+  const playerPosition = settingsStore(
+    (state) => state.player.position,
   );
 
   useNuiEvent<Partial<CompassStore>>("UPDATE_COMPASS", (data) => {
@@ -80,13 +93,13 @@ export const Compass = () => {
     [direction],
   );
 
-  const isCompact = compassStyle === "compact";
+  const isCompact = compassLayout === "compact";
   const isBottomCenter = compassPosition === "bottom-center";
   const sharesBottomCenterWithPlayer =
-    isBottomCenter && playerHudPosition === "bottom-center";
+    isBottomCenter && playerPosition === "bottom-center";
 
   const bottomOffset = sharesBottomCenterWithPlayer
-    ? getBottomPlayerHudClearance(playerStatusIndicator)
+    ? getBottomPlayerHudClearance(playerLayout)
     : "1.7vh";
 
   return (
@@ -96,7 +109,7 @@ export const Compass = () => {
       duration={300}
       timingFunction="ease"
     >
-      {(transStyles) => (
+      {(transitionStyles) => (
         <Box
           pos="fixed"
           style={{
@@ -108,7 +121,7 @@ export const Compass = () => {
             justifyContent: "center",
             zIndex: 999,
             pointerEvents: "none",
-            ...transStyles,
+            ...transitionStyles,
           }}
         >
           {isCompact ? (
@@ -117,17 +130,19 @@ export const Compass = () => {
               justify="center"
               gap="1.6vh"
               style={{
-                minWidth: "46vh",
+                width: "46vh",
               }}
             >
               <Text
                 size="1.35vh"
                 fw={900}
-                ta="left"
+                ta="right"
+                truncate
                 style={{
+                  width: "14vh",
                   lineHeight: 1,
-                  color: "rgba(255,255,255,0.95)",
-                  textShadow: "0 0 8px rgba(0,0,0,0.55)",
+                  color: "rgba(255, 255, 255, 0.95)",
+                  textShadow: "0 0 8px rgba(0, 0, 0, 0.55)",
                   textTransform: "uppercase",
                 }}
               >
@@ -141,15 +156,17 @@ export const Compass = () => {
                 px="0.8vh"
                 py="0.55vh"
                 style={{
+                  flexShrink: 0,
                   borderRadius: theme.radius.xs,
-                  border: `0.2vh solid ${alpha(theme.colors.dark[8], 1)}`,
-                  backgroundColor: alpha(theme.colors.dark[8], 1),
+                  border: `0.2vh solid ${theme.colors.dark[8]}`,
+                  backgroundColor: theme.colors.dark[8],
                   boxShadow: `0 0 10px ${theme.colors.dark[8]}`,
                 }}
               >
                 <Text size="0.85vh" fw={900} c="gray.5" lh={1}>
                   {compactDirection.previous}
                 </Text>
+
                 <Text
                   size="1.55vh"
                   fw={900}
@@ -164,6 +181,7 @@ export const Compass = () => {
                 >
                   {compactDirection.current}
                 </Text>
+
                 <Text size="0.85vh" fw={900} c="gray.5" lh={1}>
                   {compactDirection.next}
                 </Text>
@@ -173,10 +191,12 @@ export const Compass = () => {
                 size="1.35vh"
                 fw={900}
                 ta="left"
+                truncate
                 style={{
+                  width: "14vh",
                   lineHeight: 1,
-                  color: "rgba(255,255,255,0.95)",
-                  textShadow: "0 0 8px rgba(0,0,0,0.55)",
+                  color: "rgba(255, 255, 255, 0.95)",
+                  textShadow: "0 0 8px rgba(0, 0, 0, 0.55)",
                   textTransform: "uppercase",
                 }}
               >
@@ -199,7 +219,7 @@ export const Compass = () => {
                 ta="center"
                 style={{
                   lineHeight: 1,
-                  color: "rgba(255,255,255,0.65)",
+                  color: "rgba(255, 255, 255, 0.65)",
                   textTransform: "uppercase",
                 }}
               >
@@ -228,7 +248,7 @@ export const Compass = () => {
                 style={{
                   width: "36vh",
                   lineHeight: 1,
-                  color: "rgba(255,255,255,0.95)",
+                  color: "rgba(255, 255, 255, 0.95)",
                   textTransform: "uppercase",
                 }}
               >
@@ -243,7 +263,7 @@ export const Compass = () => {
                 style={{
                   width: "30vh",
                   lineHeight: 1,
-                  color: "rgba(255,255,255,0.75)",
+                  color: "rgba(255, 255, 255, 0.75)",
                   textTransform: "uppercase",
                 }}
               >

@@ -1,6 +1,6 @@
 local config = require('configs.config')
 
-if not config.useWeaponHud then return end
+if not config.features.weaponHud then return end
 
 local function updateWeapon(data)
     SendNUIMessage({

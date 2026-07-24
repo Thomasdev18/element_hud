@@ -1,6 +1,6 @@
 local config = require('configs.config')
 
-if not config.lookAtPlayerWhileSpeaking.enabled then return end
+if not config.features.lookAtPlayerWhileSpeaking then return end
 
 -- variables
 local lastTargetPlayer, lastDist = nil, 100

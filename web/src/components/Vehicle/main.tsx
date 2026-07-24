@@ -1,19 +1,43 @@
-import { memo, useMemo } from "react";
-import { Flex, Text, Transition, useMantineTheme, Box, alpha, Avatar, RingProgress } from "@mantine/core";
+import { memo, useMemo, type CSSProperties } from "react";
+import {
+  alpha,
+  Avatar,
+  Box,
+  Flex,
+  Text,
+  Transition,
+  useMantineTheme,
+} from "@mantine/core";
 import { motion } from "framer-motion";
 import { useNuiEvent } from "../../hooks/useNuiEvent";
 import { useTransitionedValue } from "../../utils/useTransitionedValue";
 import { StatsStore, VehicleStore } from "../../typings/stats";
 import { statsStore, vehicleStore } from "../../stores/stats";
-import { settingsStore, type PlayerHudPosition } from "../../stores/settings";
-import { FaBrain, FaLungs, FaWalkieTalkie, FaMicrophone, FaMicrophoneSlash, FaFireFlameCurved, FaGasPump, FaOilCan  } from "react-icons/fa6";
+import {
+  settingsStore,
+  type HudIndicatorVisibility,
+  type MantineHudColor,
+  type PlayerHudPosition,
+  type PlayerIndicatorId,
+  type StandardPlayerIndicatorId,
+  type VoiceIndicatorSetting,
+  type VehicleIndicatorId,
+  type VehicleIndicatorLayout,
+} from "../../stores/settings";
+import {
+  FaBrain,
+  FaFireFlameCurved,
+  FaGasPump,
+  FaLungs,
+  FaMicrophone,
+  FaMicrophoneSlash,
+  FaOilCan,
+  FaWalkieTalkie,
+} from "react-icons/fa6";
 import { PiHamburgerFill, PiSeatbeltFill } from "react-icons/pi";
 import { FaHeartbeat, FaShieldAlt } from "react-icons/fa";
 import { RiDrinks2Fill } from "react-icons/ri";
 import { HelicopterGauge } from "./helicopter";
-
-type PlayerStatusIndicator = "square" | "bar" | "circle" | "segmented" | "segmented-bar";
-type VehicleHudStyle = "bars" | "speedometer" | "speedometer-column";
 
 const playerHudPositionStyles: Record<PlayerHudPosition, React.CSSProperties> = {
   "bottom-left": {
@@ -56,16 +80,11 @@ const getPlayerHudTransition = (position: PlayerHudPosition) => {
   return "slide-right" as const;
 };
 
-const statColorMap: Record<string, string> = {
-  red: 'var(--mantine-color-red-light-hover)',
-  blue: 'var(--mantine-color-blue-light-hover)',
-  green: 'var(--mantine-color-green-light-hover)',
-  yellow: 'var(--mantine-color-yellow-light-hover)',
-  orange: 'var(--mantine-color-orange-light-hover)',
-  cyan: 'var(--mantine-color-cyan-light-hover)',
-  gray: 'var(--mantine-color-gray-light-hover)',
-  violet: 'var(--mantine-color-violet-light-hover)'
-};
+const getProgressColor = (color: MantineHudColor) =>
+  `var(--mantine-color-${color}-light-hover)`;
+
+const clampPercentage = (value: number) =>
+  Math.max(0, Math.min(value, 100));
 
 const StatIndicator = ({
   value,
@@ -74,13 +93,13 @@ const StatIndicator = ({
   size = 'md'
 }: {
   value: number;
-  color: string;
+  color: MantineHudColor;
   Icon: React.ElementType;
   size?: 'sm' | 'md';
 }) => {
   const theme = useMantineTheme();
 
-  const progressColor = statColorMap[color] || 'var(--mantine-color-blue-light-hover)';
+  const progressColor = getProgressColor(color);
   const shadowColor = theme.colors[color]?.[4] || theme.colors.blue[4];
   const avatarSize = size === 'sm' ? '3.1vh' : '3.5vh';
   const iconSize = size === 'sm' ? '2.6vh' : '2.8vh';
@@ -114,7 +133,7 @@ const StatIndicator = ({
             height: '100%',
             borderRadius: theme.radius.xxs,
             border: `0.2vh solid ${alpha(theme.colors.dark[8], 0.7)}`,
-            clipPath: `inset(${100 - value}% 0 0 0)`,
+            clipPath: `inset(${100 - clampPercentage(value)}% 0 0 0)`,
             zIndex: 0,
           }}
         />
@@ -145,12 +164,12 @@ const BarStatIndicator = ({
   size = 'md'
 }: {
   value: number;
-  color: string;
+  color: MantineHudColor;
   Icon: React.ElementType;
   size?: 'sm' | 'md';
 }) => {
   const theme = useMantineTheme();
-  const progressColor = statColorMap[color] || 'var(--mantine-color-blue-light-hover)';
+  const progressColor = getProgressColor(color);
   const shadowColor = theme.colors[color]?.[4] || theme.colors.blue[4];
   const iconSize = size === 'sm' ? '2.1vh' : '2.35vh';
   const iconBoxSize = size === 'sm' ? '2.8vh' : '3.1vh';
@@ -195,7 +214,7 @@ const BarStatIndicator = ({
       >
         <Box
           style={{
-            width: `${Math.max(0, Math.min(value, 100))}%`,
+            width: `${clampPercentage(value)}%`,
             height: '100%',
             borderRadius: '0.1vh',
             backgroundColor: shadowColor,
@@ -215,14 +234,12 @@ const CircleStatIndicator = ({
   size = "md",
 }: {
   value: number;
-  color: string;
+  color: MantineHudColor;
   Icon: React.ElementType;
   size?: "sm" | "md";
 }) => {
   const theme = useMantineTheme();
-  const clampedValue = Math.max(0, Math.min(value, 100));
-
-  const progressColor = statColorMap[color] || 'var(--mantine-color-blue-light-hover)';
+    const progressColor = getProgressColor(color);
   const shadowColor = theme.colors[color]?.[4] || theme.colors.blue[4];
   const avatarSize = size === 'sm' ? '3.1vh' : '3.8vh';
   const iconSize = size === 'sm' ? '2.6vh' : '2.3vh';
@@ -256,7 +273,7 @@ const CircleStatIndicator = ({
             height: '100%',
             borderRadius: '50%',
             border: `0.2vh solid ${alpha(theme.colors.dark[8], 0.7)}`,
-            clipPath: `inset(${100 - value}% 0 0 0)`,
+            clipPath: `inset(${100 - clampPercentage(value)}% 0 0 0)`,
             zIndex: 0,
           }}
         />
@@ -280,118 +297,23 @@ const CircleStatIndicator = ({
   );
 };
 
-const SegmentedStatusBar = ({
-  value,
-  color,
-}: {
-  value: number;
-  color: string;
-}) => {
-  const theme = useMantineTheme();
-  const clampedValue = Math.max(0, Math.min(value, 100));
-  const segmentCount = 5;
-  const shadowColor = theme.colors[color]?.[4] || theme.colors.blue[4];
-
-  return (
-    <Box
-      style={{
-        width: "25vh",
-        height: "1.4vh",
-        padding: "0.18vh",
-        borderRadius: "0.18vh",
-        backgroundColor: alpha(theme.colors.dark[8], 1),
-        boxShadow: `0 0 10px ${theme.colors.dark[8]}`,
-        overflow: "hidden",
-      }}
-    >
-      <Flex gap="0.16vh" h="100%">
-        {Array.from({ length: segmentCount }).map((_, index) => {
-          const segmentSize = 100 / segmentCount;
-          const segmentStart = index * segmentSize;
-          const segmentFill = Math.max(0, Math.min((clampedValue - segmentStart) / segmentSize, 1));
-
-          return (
-            <Box
-              key={index}
-              style={{
-                flex: 1,
-                height: "100%",
-                borderRadius: "0.08vh",
-                backgroundColor: theme.colors.dark[6],
-                overflow: "hidden",
-              }}
-            >
-              <Box
-                style={{
-                  width: `${segmentFill * 100}%`,
-                  height: "100%",
-                  backgroundColor: shadowColor,
-                  boxShadow: segmentFill > 0 ? `0 0 8px ${shadowColor}` : "none",
-                  transition: "width 0.25s ease",
-                }}
-              />
-            </Box>
-          );
-        })}
-      </Flex>
-    </Box>
-  );
-};
-
-const PlainStatusBar = ({
-  value,
-  color,
-}: {
-  value: number;
-  color: string;
-}) => {
-  const theme = useMantineTheme();
-  const clampedValue = Math.max(0, Math.min(value, 100));
-  const shadowColor = theme.colors[color]?.[4] || theme.colors.blue[4];
-
-  return (
-    <Box
-      style={{
-        width: "25vh",
-        height: "1.4vh",
-        padding: "0.18vh",
-        borderRadius: "0.18vh",
-        backgroundColor: alpha(theme.colors.dark[8], 1),
-        boxShadow: `0 0 10px ${theme.colors.dark[8]}`,
-        overflow: "hidden",
-      }}
-    >
-      <Box
-        style={{
-          width: `${clampedValue}%`,
-          height: "100%",
-          borderRadius: "0.08vh",
-          backgroundColor: shadowColor,
-          boxShadow: clampedValue > 0 ? `0 0 8px ${shadowColor}` : "none",
-          transition: "width 0.25s ease",
-        }}
-      />
-    </Box>
-  );
-};
-
 const StatBox = ({
   value,
   color,
   Icon,
   size = 'md',
-  indicator = "square"
+  indicator = "icons"
 }: {
   value: number;
-  color: string;
+  color: MantineHudColor;
   Icon: React.ElementType;
   size?: 'sm' | 'md';
-  indicator?: PlayerStatusIndicator;
+  indicator?: VehicleIndicatorLayout;
 }) => (
   <Flex direction="column" align="center">
-    {indicator === "bar" ? (
+    {indicator === "minimal" ? (
       <BarStatIndicator value={value} color={color} Icon={Icon} size={size} />
-    ) : indicator === "circle" ? (
+    ) : indicator === "circular" ? (
       <CircleStatIndicator value={value} color={color} Icon={Icon} size={size} />
     ) : (
       <StatIndicator value={value} color={color} Icon={Icon} size={size} />
@@ -455,23 +377,15 @@ const getVoiceProgress = (voiceLevel: number) => {
   return 100;
 };
 
-const getVoiceColor = (talking: string | boolean) => {
-  if (!talking) return 'gray';
-  if (talking === 'voice') return 'orange';
-  return 'orange';
+const getVoiceStateColor = (
+  talking: string | boolean,
+  setting: VoiceIndicatorSetting,
+) => {
+  if (!talking) return setting.colors.inactive;
+  if (talking === "voice") return setting.colors.voice;
+  return setting.colors.radio;
 };
 
-const getFuelColor = (fuel: number) => {
-  if (fuel > 50) return "green";
-  if (fuel > 20) return "yellow";
-  return "red";
-};
-
-const getEngineColor = (engineHealth: number) => {
-  if (engineHealth > 70) return "green";
-  if (engineHealth > 30) return "yellow";
-  return "red";
-};
 
 const VEHICLE_HUD_WIDTH = "28vh";
 
@@ -631,7 +545,7 @@ const SpeedometerGauge = memo(function SpeedometerGauge({
             animate={{ strokeDashoffset: 1 - percentage / 100 }}
             transition={{ type: "tween", ease: "linear", duration: 0.15 }}
             style={{
-              stroke: percentage >= 90 ? "#ff8787" : percentage >= 85 ? "#4dabf7" : "#4dabf7",
+              stroke: percentage >= 90 ? "#ff8787" : "#4dabf7",
             }}
           />
 
@@ -750,10 +664,31 @@ const RpmBars = ({ rpm }: { rpm: number }) => {
   );
 };
 
+const shouldRenderIndicator = (
+  setting: { visibility: HudIndicatorVisibility },
+  dynamicCondition: boolean,
+) => {
+  if (setting.visibility === "hidden") return false;
+  if (setting.visibility === "always") return true;
+  return dynamicCondition;
+};
+
+
 export default function CombinedHud() {
   const theme = useMantineTheme();
 
-  const { open: playerOpen, health, armor, hunger, thirst, stress, stamina, voice, talking } = statsStore();
+  const {
+    open: playerOpen,
+    health,
+    armor,
+    hunger,
+    thirst,
+    stress,
+    stamina,
+    voice,
+    talking,
+  } = statsStore();
+
   const {
     open: vehicleOpen,
     isHelicopter,
@@ -770,17 +705,16 @@ export default function CombinedHud() {
     nos,
     harness,
   } = vehicleStore();
-  const playerStatusIndicator = settingsStore(
-    (state) => state.playerStatusIndicator
-  );
-  const playerHudPosition = settingsStore(
-    (state) => state.playerHudPosition ?? "bottom-left"
-  ) as PlayerHudPosition;
-  const vehicleHudStyle = settingsStore(
-    (state: any) => state.vehicleHudStyle ?? "bars"
-  ) as VehicleHudStyle;
 
-  useNuiEvent<Partial<StatsStore>>('UPDATE_STATS', (data) => {
+  const playerSettings = settingsStore((state) => state.player);
+  const vehicleSettings = settingsStore((state) => state.vehicle);
+
+  const playerLayout = playerSettings.layout;
+  const playerHudPosition = playerSettings.position as PlayerHudPosition;
+  const vehicleLayout = vehicleSettings.layout;
+  const vehicleIndicatorLayout = vehicleSettings.indicatorLayout;
+
+  useNuiEvent<Partial<StatsStore>>("UPDATE_STATS", (data) => {
     statsStore.setState(data);
   });
 
@@ -801,17 +735,14 @@ export default function CombinedHud() {
   const smoothEngineHealth = useTransitionedValue(engineHealth, 250);
   const smoothFuel = useTransitionedValue(fuel, 250);
   const smoothNos = useTransitionedValue(nos, 250);
-  const smoothSeatbelt = useTransitionedValue(seatbelt ? 100 : 50, 250);
-
   const smoothRpm = useTransitionedValue(rpm, 150);
 
   const speedDisplay = useMemo(() => {
-    const speedStr = String(Math.round(smoothSpeed)).padStart(3, '0');
-    return speedStr.split('').map((digit, index) => {
+    const speedStr = String(Math.round(smoothSpeed)).padStart(3, "0");
+
+    return speedStr.split("").map((digit, index) => {
       const isLeadingZero =
-        smoothSpeed < 100 &&
-        digit === '0' &&
-        index < speedStr.length - 1;
+        smoothSpeed < 100 && digit === "0" && index < speedStr.length - 1;
       const isActive = smoothSpeed >= 100 || !isLeadingZero;
 
       return (
@@ -823,7 +754,7 @@ export default function CombinedHud() {
             textShadow: isActive
               ? `0 0 10px ${theme.colors.blue[4]}`
               : `0 0 10px ${theme.colors.gray[4]}`,
-            display: 'inline-block',
+            display: "inline-block",
           }}
           fw={500}
           ff="digital-7"
@@ -835,12 +766,52 @@ export default function CombinedHud() {
     });
   }, [smoothSpeed, theme]);
 
-  const vehicleStatusIndicator: PlayerStatusIndicator =
-    playerStatusIndicator === "segmented"
-      ? "square"
-      : playerStatusIndicator === "segmented-bar"
-        ? "bar"
-        : playerStatusIndicator;
+  const showPlayerIndicator = (
+    indicator: PlayerIndicatorId,
+    dynamicCondition: boolean,
+  ) =>
+    shouldRenderIndicator(
+      playerSettings.indicators[indicator],
+      dynamicCondition,
+    );
+
+  const showVehicleIndicator = (
+    indicator: VehicleIndicatorId,
+    dynamicCondition: boolean,
+  ) =>
+    shouldRenderIndicator(
+      vehicleSettings.indicators[indicator],
+      dynamicCondition,
+    );
+
+  const playerColor = (indicator: StandardPlayerIndicatorId) =>
+    playerSettings.indicators[indicator].color;
+
+  const vehicleColor = (indicator: "gear" | "nitrous") =>
+    vehicleSettings.indicators[indicator].color;
+
+  const seatbeltFastened = Boolean(seatbelt || harness);
+  const seatbeltColor =
+    vehicleSettings.indicators.seatbelt.colors[
+      seatbeltFastened ? "fastened" : "unfastened"
+    ];
+
+  const engineState =
+    engineHealth <= 30 ? "low" : engineHealth <= 65 ? "medium" : "high";
+  const engineColor =
+    vehicleSettings.indicators.engine.colors[engineState];
+
+  const fuelState =
+    fuel <= 20 ? "low" : fuel <= 50 ? "medium" : "high";
+  const fuelColor =
+    vehicleSettings.indicators.fuel.colors[fuelState];
+
+  const iconLayout: VehicleIndicatorLayout =
+    playerLayout === "minimal"
+      ? "minimal"
+      : playerLayout === "circular"
+        ? "circular"
+        : "icons";
 
   const VehicleStatusRow = ({
     justify = "start",
@@ -850,192 +821,132 @@ export default function CombinedHud() {
     includeGear?: boolean;
   }) => (
     <Flex
-      align={vehicleStatusIndicator === "bar" ? "end" : "start"}
+      align={vehicleIndicatorLayout === "minimal" ? "end" : "start"}
       justify={justify}
       gap="0.7vh"
     >
-      {includeGear && (
+      {includeGear &&
+        showVehicleIndicator("gear", currentGear !== "") && (
+          <StatBox
+            Icon={(props: any) => (
+              <GearIcon {...props} gear={currentGear} />
+            )}
+            value={100}
+            color={vehicleColor("gear")}
+            indicator={vehicleIndicatorLayout}
+          />
+        )}
+
+      {showVehicleIndicator("seatbelt", !seatbeltFastened) && (
         <StatBox
-          Icon={(props: any) => (
-            <GearIcon
-              {...props}
-              gear={currentGear}
-            />
-          )}
+          Icon={PiSeatbeltFill}
           value={100}
-          color="blue"
-          indicator={vehicleStatusIndicator}
+          color={seatbeltColor}
+          indicator={vehicleIndicatorLayout}
         />
       )}
 
-      <StatBox
-        Icon={PiSeatbeltFill}
-        value={smoothSeatbelt}
-        color={seatbelt || harness ? "green" : "red"}
-        indicator={vehicleStatusIndicator}
-      />
+      {showVehicleIndicator("engine", engineHealth < 100) && (
+        <StatBox
+          Icon={FaOilCan}
+          value={smoothEngineHealth}
+          color={engineColor}
+          indicator={vehicleIndicatorLayout}
+        />
+      )}
 
-      <StatBox
-        Icon={FaOilCan}
-        value={smoothEngineHealth}
-        color={getEngineColor(engineHealth)}
-        indicator={vehicleStatusIndicator}
-      />
+      {showVehicleIndicator("fuel", fuel < 100) && (
+        <StatBox
+          Icon={FaGasPump}
+          value={smoothFuel}
+          color={fuelColor}
+          indicator={vehicleIndicatorLayout}
+        />
+      )}
 
-      <StatBox
-        Icon={FaGasPump}
-        value={smoothFuel}
-        color={getFuelColor(fuel)}
-        indicator={vehicleStatusIndicator}
-      />
-
-      {nos > 0 && (
+      {showVehicleIndicator("nitrous", nos > 0) && (
         <StatBox
           Icon={FaFireFlameCurved}
           value={smoothNos}
-          color="violet"
-          indicator={vehicleStatusIndicator}
+          color={vehicleColor("nitrous")}
+          indicator={vehicleIndicatorLayout}
         />
       )}
     </Flex>
   );
 
-  const isSpeedometerColumn = vehicleHudStyle === "speedometer-column";
-  const isSegmentedPlayerHud = playerStatusIndicator === "segmented";
-  const isSegmentedBarPlayerHud = playerStatusIndicator === "segmented-bar";
-
-  const PlayerIconStatuses = ({
-    indicator = "square",
-  }: {
-    indicator?: PlayerStatusIndicator;
-  }) => (
-    <Flex align="end" gap="0.7vh">
-      <StatBox
-        value={smoothMappedVoice}
-        color={getVoiceColor(talking)}
-        indicator={indicator}
-        Icon={(props: any) => (
-          <VoiceIcon
-            {...props}
-            voiceLevel={voice}
-            talking={talking}
-          />
-        )}
-      />
-
-      <StatBox
-        value={smoothHunger}
-        color="orange"
-        Icon={PiHamburgerFill}
-        indicator={indicator}
-      />
-
-      <StatBox
-        value={smoothThirst}
-        color="cyan"
-        Icon={RiDrinks2Fill}
-        indicator={indicator}
-      />
-
-      {stamina < 100 && (
-        <StatBox
-          value={smoothStamina}
-          color="blue"
-          Icon={FaLungs}
-          indicator={indicator}
-        />
-      )}
-
-      {smoothStress > 0 && (
-        <StatBox
-          value={smoothStress}
-          color="violet"
-          Icon={FaBrain}
-          indicator={indicator}
-        />
-      )}
-    </Flex>
-  );
-
-  const SegmentedBars = () => (
-    <Flex direction="column" gap="0.25vh" align="start" justify={'start'}>
-      <SegmentedStatusBar value={smoothArmor} color="blue" />
-      <PlainStatusBar value={smoothHealth} color="red" />
-    </Flex>
-  );
+  const isDialVehicleHud = vehicleLayout === "dial";
 
   return (
     <>
-      <div style={{
-        position: 'fixed',
-        right: '1vw',
-        bottom: '1vh',
-        zIndex: 100,
-      }}>
-  <Transition mounted={vehicleOpen} transition="slide-left" duration={300} timingFunction="ease">
-    {(transStyles) => (
-    <Flex
-      direction="column"
-      align={isHelicopter || isSpeedometerColumn ? "center" : "stretch"}
-      gap={isHelicopter || isSpeedometerColumn ? "0.35vh" : "0.7vh"}
-      style={{
-        width: isHelicopter ? "38vh" : isSpeedometerColumn ? "30vh" : VEHICLE_HUD_WIDTH,
-        ...transStyles,
-      }}
-    >
-      {isHelicopter ? (
-        <>
-          <HelicopterGauge
-            airspeed={smoothSpeed}
-            altitude={smoothAltitude}
-            pitch={pitch}
-            roll={roll}
-          />
-          <VehicleStatusRow justify="center" includeGear={true} />
-        </>
-      ) : isSpeedometerColumn ? (
-        <>
-          <SpeedometerGauge
-            speed={smoothSpeed}
-            rpm={smoothRpm}
-            gear={currentGear}
-            speedUnit={speedUnit}
-          />
-          <VehicleStatusRow justify="center" includeGear={true} />
-        </>
-      ) : (
-        <>
-          {/* SPEED */}
-          <Flex
-            justify="start"
-            align="start"
-            style={{
-              width: "100%",
-            }}
-          >
-            <Flex align="end" justify="end" direction={'row'} gap="1vh">
-              <Flex
-                gap="0.5vh"
-                mb="-1vh"
-                style={{
-                  justifyContent: "end",
-                }}
-              >
-                {speedDisplay}
-              </Flex>
-              <Text fz="lg" c="gray" fw={700}>
-                {speedUnit}
-              </Text>
-            </Flex>
-          </Flex>
+      <div
+        style={{
+          position: "fixed",
+          right: "1vw",
+          bottom: "1vh",
+          zIndex: 100,
+        }}
+      >
+        <Transition
+          mounted={vehicleOpen}
+          transition="slide-left"
+          duration={300}
+          timingFunction="ease"
+        >
+          {(transStyles: CSSProperties) => (
+            <Flex
+              direction="column"
+              align={isHelicopter || isDialVehicleHud ? "center" : "stretch"}
+              gap={isHelicopter || isDialVehicleHud ? "0.35vh" : "0.7vh"}
+              style={{
+                width: isHelicopter
+                  ? "38vh"
+                  : isDialVehicleHud
+                    ? "30vh"
+                    : VEHICLE_HUD_WIDTH,
+                ...transStyles,
+              }}
+            >
+              {isHelicopter ? (
+                <>
+                  <HelicopterGauge
+                    airspeed={smoothSpeed}
+                    altitude={smoothAltitude}
+                    pitch={pitch}
+                    roll={roll}
+                  />
+                  <VehicleStatusRow justify="center" includeGear />
+                </>
+              ) : isDialVehicleHud ? (
+                <>
+                  <SpeedometerGauge
+                    speed={smoothSpeed}
+                    rpm={smoothRpm}
+                    gear={currentGear}
+                    speedUnit={speedUnit}
+                  />
+                  <VehicleStatusRow justify="center" includeGear />
+                </>
+              ) : (
+                <>
+                  <Flex justify="start" align="start" w="100%">
+                    <Flex align="end" justify="end" direction="row" gap="1vh">
+                      <Flex gap="0.5vh" mb="-1vh" style={{ justifyContent: "end" }}>
+                        {speedDisplay}
+                      </Flex>
+                      <Text fz="lg" c="gray" fw={700}>
+                        {speedUnit}
+                      </Text>
+                    </Flex>
+                  </Flex>
 
-          <RpmBars rpm={smoothRpm} />
-          <VehicleStatusRow />
-        </>
-      )}
-      </Flex>
-    )}
-  </Transition>
+                  <RpmBars rpm={smoothRpm} />
+                  <VehicleStatusRow />
+                </>
+              )}
+            </Flex>
+          )}
+        </Transition>
       </div>
 
       <div
@@ -1051,96 +962,82 @@ export default function CombinedHud() {
           duration={300}
           timingFunction="ease"
         >
-          {(transStyles) => (
+          {(transStyles: CSSProperties) => (
             <Flex
               align="end"
               gap="1.1vh"
-              style={{
-                position: "relative",
-                ...transStyles,
-              }}
+              style={{ position: "relative", ...transStyles }}
             >
-
-              {isSegmentedPlayerHud ? (
-                <Flex align="start" gap="0.7vh">
-                  <Flex direction="column" gap="0.7vh" justify={'start'} align={'start'}>
-                    <SegmentedBars />
-                    <PlayerIconStatuses indicator="square" />
-                  </Flex>
-                </Flex>
-              ) : isSegmentedBarPlayerHud ? (
-                <Flex
-                  align="start"
-                  gap="0.7vh"
-                  p="0.45vh"
-                >
-                  <SegmentedBars />
-                  <PlayerIconStatuses indicator="square" />
-                </Flex>
-              ) : (
                 <Flex align="end" gap="0.7vh">
-                  <StatBox
-                    value={smoothMappedVoice}
-                    color={getVoiceColor(talking)}
-                    indicator={playerStatusIndicator}
-                    Icon={(props: any) => (
-                      <VoiceIcon
-                        {...props}
-                        voiceLevel={voice}
-                        talking={talking}
-                      />
-                    )}
-                  />
+                  {showPlayerIndicator("voice", Boolean(talking)) && (
+                    <StatBox
+                      value={smoothMappedVoice}
+                      color={getVoiceStateColor(talking, playerSettings.indicators.voice)}
+                      indicator={iconLayout}
+                      Icon={(props: any) => (
+                        <VoiceIcon
+                          {...props}
+                          voiceLevel={voice}
+                          talking={talking}
+                        />
+                      )}
+                    />
+                  )}
 
-                  <StatBox
-                    value={smoothHealth}
-                    color="red"
-                    Icon={FaHeartbeat}
-                    indicator={playerStatusIndicator}
-                  />
+                  {showPlayerIndicator("health", health < 100) && (
+                    <StatBox
+                      value={smoothHealth}
+                      color={playerColor("health")}
+                      Icon={FaHeartbeat}
+                      indicator={iconLayout}
+                    />
+                  )}
 
-                  {smoothArmor > 0 && (
+                  {showPlayerIndicator("armor", armor > 0) && (
                     <StatBox
                       value={smoothArmor}
-                      color="blue"
+                      color={playerColor("armor")}
                       Icon={FaShieldAlt}
-                      indicator={playerStatusIndicator}
+                      indicator={iconLayout}
                     />
                   )}
 
-                  <StatBox
-                    value={smoothHunger}
-                    color="orange"
-                    Icon={PiHamburgerFill}
-                    indicator={playerStatusIndicator}
-                  />
+                  {showPlayerIndicator("hunger", hunger < 100) && (
+                    <StatBox
+                      value={smoothHunger}
+                      color={playerColor("hunger")}
+                      Icon={PiHamburgerFill}
+                      indicator={iconLayout}
+                    />
+                  )}
 
-                  <StatBox
-                    value={smoothThirst}
-                    color="cyan"
-                    Icon={RiDrinks2Fill}
-                    indicator={playerStatusIndicator}
-                  />
+                  {showPlayerIndicator("thirst", thirst < 100) && (
+                    <StatBox
+                      value={smoothThirst}
+                      color={playerColor("thirst")}
+                      Icon={RiDrinks2Fill}
+                      indicator={iconLayout}
+                    />
+                  )}
 
-                  {stamina < 100 && (
+                  {showPlayerIndicator("stamina", stamina < 100) && (
                     <StatBox
                       value={smoothStamina}
-                      color="blue"
+                      color={playerColor("stamina")}
                       Icon={FaLungs}
-                      indicator={playerStatusIndicator}
+                      indicator={iconLayout}
                     />
                   )}
 
-                  {smoothStress > 0 && (
+                  {showPlayerIndicator("stress", stress > 0) && (
                     <StatBox
                       value={smoothStress}
-                      color="violet"
+                      color={playerColor("stress")}
                       Icon={FaBrain}
-                      indicator={playerStatusIndicator}
+                      indicator={iconLayout}
                     />
                   )}
                 </Flex>
-              )}
             </Flex>
           )}
         </Transition>

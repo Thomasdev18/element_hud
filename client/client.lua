@@ -1,22 +1,22 @@
 local config = require('configs.config')
 local bridge = require('bridge.bridge')
 
-local SPEED_MULTIPLIER = config.useMPH and 2.23694 or 3.6
-local SPEED_UNIT = config.useMPH and 'MPH' or 'KMT'
+local speedUnitSetting = config.units and config.units.speed or (config.useMPH and 'mph' or 'kph')
+local SPEED_MULTIPLIER = speedUnitSetting == 'mph' and 2.23694 or 3.6
+local SPEED_UNIT = speedUnitSetting == 'mph' and 'MPH' or 'KMT'
 local HUD_UPDATE_INTERVAL = 250
 local VEHICLE_UPDATE_INTERVAL = 250
 local HELICOPTER_UPDATE_INTERVAL = 250
 local HELICOPTER_VEHICLE_CLASS = 15
 local HUD_SETTINGS_KEY = 'hudSettings'
+local HUD_SETTINGS_CONFIG = config.hudSettings or {}
+local HUD_SETTINGS_ENABLED = HUD_SETTINGS_CONFIG.enabled ~= false
+local RAW_HUD_SETTINGS_DEFAULTS = assert(HUD_SETTINGS_CONFIG.defaults or HUD_SETTINGS_CONFIG.defaultHUDSettings, 'Missing config.hudSettings.defaults')
 
-local DEFAULT_HUD_SETTINGS = config.hudSettings.defaultHUDSettings
-
-local VALID_PLAYER_STATUS_INDICATORS = {
-    square = true,
-    bar = true,
-    circle = true,
-    segmented = true,
-    ['segmented-bar'] = true,
+local VALID_PLAYER_LAYOUTS = {
+    icons = true,
+    minimal = true,
+    circular = true,
 }
 
 local VALID_PLAYER_HUD_POSITIONS = {
@@ -26,20 +26,47 @@ local VALID_PLAYER_HUD_POSITIONS = {
     ['bottom-center'] = true,
 }
 
-local VALID_VEHICLE_HUD_STYLES = {
-    bars = true,
-    speedometer = true,
-    ['speedometer-column'] = true,
+local VALID_VEHICLE_LAYOUTS = {
+    digital = true,
+    dial = true,
 }
 
-local VALID_COMPASS_STYLES = {
-    default = true,
+local VALID_VEHICLE_INDICATOR_LAYOUTS = {
+    icons = true,
+    minimal = true,
+    circular = true,
+}
+
+local VALID_COMPASS_LAYOUTS = {
+    full = true,
     compact = true,
 }
 
 local VALID_COMPASS_POSITIONS = {
     ['top-center'] = true,
     ['bottom-center'] = true,
+}
+
+local VALID_INDICATOR_VISIBILITY = {
+    always = true,
+    dynamic = true,
+    hidden = true,
+}
+
+local VALID_INDICATOR_COLORS = {
+    gray = true,
+    red = true,
+    pink = true,
+    grape = true,
+    violet = true,
+    indigo = true,
+    blue = true,
+    cyan = true,
+    teal = true,
+    green = true,
+    lime = true,
+    yellow = true,
+    orange = true,
 }
 
 local cachedPlayerStats = {}
@@ -84,30 +111,12 @@ local function sendNUIMessage(action, data)
     })
 end
 
-local function updatePlayerHud(data)
-    if hudState.hudDisabled then
-        sendNUIMessage("UPDATE_STATS", { open = false })
-        return
-    end
-
-    local shouldUpdate = false
-    for k, v in pairs(data) do
-        if cachedPlayerStats[k] ~= v then
-            cachedPlayerStats[k] = v
-            shouldUpdate = true
-        end
-    end
-    if shouldUpdate then
-        sendNUIMessage("UPDATE_STATS", cachedPlayerStats)
-    end
-end
-
-local function updateVehicleHud(data)
-    local changes = nil
+local function updateNuiState(action, cacheTable, data)
+    local changes
 
     for key, value in pairs(data) do
-        if cachedVehicleStats[key] ~= value then
-            cachedVehicleStats[key] = value
+        if cacheTable[key] ~= value then
+            cacheTable[key] = value
 
             changes = changes or {}
             changes[key] = value
@@ -115,26 +124,20 @@ local function updateVehicleHud(data)
     end
 
     if changes then
-        sendNUIMessage('UPDATE_VEHICLE', changes)
+        sendNUIMessage(action, changes)
     end
 end
 
-local function updateCompass(data)
-    if hudState.hudDisabled then
-        sendNUIMessage("UPDATE_COMPASS", { open = false })
-        return
-    end
+local function updatePlayerHud(data)
+    updateNuiState('UPDATE_STATS', cachedPlayerStats, data)
+end
 
-    local shouldUpdate = false
-    for k, v in pairs(data) do
-        if cachedRoute[k] ~= v then
-            cachedRoute[k] = v
-            shouldUpdate = true
-        end
-    end
-    if shouldUpdate then
-        sendNUIMessage("UPDATE_COMPASS", cachedRoute)
-    end
+local function updateVehicleHud(data)
+    updateNuiState('UPDATE_VEHICLE', cachedVehicleStats, data)
+end
+
+local function updateCompass(data)
+    updateNuiState('UPDATE_COMPASS', cachedRoute, data)
 end
 
 local function toggleMinimap(show)
@@ -148,8 +151,10 @@ local function toggleMinimap(show)
 end
 
 local function toggleSettings(show)
+    if show and not HUD_SETTINGS_ENABLED then return end
     if show and hudState.settingsOpen then return end
-    sendNUIMessage("TOGGLE_SETTINGS", show)
+
+    sendNUIMessage('TOGGLE_SETTINGS', show)
     SetNuiFocus(show, show)
     hudState.settingsOpen = show
 end
@@ -186,14 +191,19 @@ local function hudOff()
 end
 
 local function getPlayerStats()
-    local stamina = 100 - GetPlayerSprintStaminaRemaining(cache.playerId)
-    local oxygen = IsPedSwimmingUnderWater(cache.ped) and (GetPlayerUnderwaterTimeRemaining(cache.playerId) * 10) or 100
-    local playerMode = IsEntityInWater(cache.ped) and 'water' or 'land'
     local playerData = bridge.GetPlayerData()
 
     if not playerData or not playerData.metadata then
-        lib.print.info("Waiting for player data to load")
+        lib.print.info('Waiting for player data to load')
         return nil
+    end
+
+    local isUnderwater = IsPedSwimmingUnderWater(cache.ped)
+    local stamina = math.max(0, math.min(100, GetPlayerSprintStaminaRemaining(cache.playerId)))
+    local oxygen = 100
+
+    if isUnderwater then
+        oxygen = math.max(0, math.min(100, GetPlayerUnderwaterTimeRemaining(cache.playerId) * 10))
     end
 
     return {
@@ -204,7 +214,7 @@ local function getPlayerStats()
         stress = LocalPlayer.state.stress or 0,
         voice = playerState.proximity.distance or 0,
         talking = GetPlayerVoiceMethod(cache.playerId),
-        stamina = playerMode == 'land' and stamina or oxygen,
+        stamina = math.floor((isUnderwater and oxygen or stamina) + 0.5),
     }
 end
 
@@ -445,106 +455,260 @@ local function onCloseSettings(_, cb)
     cb(1)
 end
 
-local function copyTable(source)
+local activeHudSettings
+
+local function deepCopy(value)
+    if type(value) ~= 'table' then return value end
+
     local result = {}
 
-    for key, value in pairs(source) do
-        result[key] = value
+    for key, child in pairs(value) do
+        result[key] = deepCopy(child)
     end
 
     return result
 end
 
-local function SaveHudSettings(settings)
-    SaveData(HUD_SETTINGS_KEY, settings)
-end
+local DEFAULT_VEHICLE_STATE_COLORS = {
+    seatbelt = {
+        fastened = 'green',
+        unfastened = 'red',
+    },
+    engine = {
+        high = 'green',
+        medium = 'orange',
+        low = 'red',
+    },
+    fuel = {
+        high = 'green',
+        medium = 'orange',
+        low = 'red',
+    },
+}
 
-local function LoadHudSettings()
-    local settings = LoadData(HUD_SETTINGS_KEY)
-    local changed = false
+local function buildDefaultHudSettings()
+    local defaults = deepCopy(RAW_HUD_SETTINGS_DEFAULTS)
+    local vehicleIndicators = defaults.vehicle and defaults.vehicle.indicators
 
-    if type(settings) ~= 'table' then
-        settings = copyTable(DEFAULT_HUD_SETTINGS)
-        changed = true
+    if not vehicleIndicators then
+        return defaults
     end
 
-    for key, defaultValue in pairs(DEFAULT_HUD_SETTINGS) do
-        if settings[key] == nil then
-            settings[key] = defaultValue
+    for indicator, colors in pairs(DEFAULT_VEHICLE_STATE_COLORS) do
+        local setting = vehicleIndicators[indicator]
+
+        if type(setting) ~= 'table' then
+            setting = {
+                visibility = 'dynamic',
+            }
+            vehicleIndicators[indicator] = setting
+        end
+
+        local configuredColors = type(setting.colors) == 'table' and setting.colors or {}
+
+        for state, fallbackColor in pairs(colors) do
+            if not VALID_INDICATOR_COLORS[configuredColors[state]] then
+                configuredColors[state] = fallbackColor
+            end
+        end
+
+        setting.colors = configuredColors
+        setting.color = nil
+    end
+
+    return defaults
+end
+
+local DEFAULT_HUD_SETTINGS = buildDefaultHudSettings()
+
+local function createDefaultHudSettings()
+    return {
+        hudEnabled = DEFAULT_HUD_SETTINGS.hudEnabled,
+        cinematicBarsHeight = DEFAULT_HUD_SETTINGS.cinematicBarsHeight,
+        player = deepCopy(DEFAULT_HUD_SETTINGS.player),
+        vehicle = deepCopy(DEFAULT_HUD_SETTINGS.vehicle),
+        compass = deepCopy(DEFAULT_HUD_SETTINGS.compass),
+    }
+end
+
+local function validateIndicatorGroup(settingsGroup, defaultGroup)
+    local changed = false
+
+    if type(settingsGroup) ~= 'table' then
+        return deepCopy(defaultGroup), true
+    end
+
+    for indicator, defaultSetting in pairs(defaultGroup) do
+        local setting = settingsGroup[indicator]
+
+        if type(setting) ~= 'table' then
+            settingsGroup[indicator] = deepCopy(defaultSetting)
             changed = true
+        else
+            if not VALID_INDICATOR_VISIBILITY[setting.visibility] then
+                setting.visibility = defaultSetting.visibility
+                changed = true
+            end
+
+            if type(defaultSetting.colors) == 'table' then
+                if type(setting.colors) ~= 'table' then
+                    setting.colors = deepCopy(defaultSetting.colors)
+                    changed = true
+                end
+
+                for state, defaultColor in pairs(defaultSetting.colors) do
+                    if not VALID_INDICATOR_COLORS[setting.colors[state]] then
+                        setting.colors[state] = defaultColor
+                        changed = true
+                    end
+                end
+
+                setting.color = nil
+            elseif not VALID_INDICATOR_COLORS[setting.color] then
+                setting.color = defaultSetting.color
+                changed = true
+            end
         end
     end
 
-    if type(settings.hudDisabled) ~= 'boolean' then
-        settings.hudDisabled = DEFAULT_HUD_SETTINGS.hudDisabled
+    return settingsGroup, changed
+end
+
+local function validateHudSettings(settings)
+    local changed = false
+
+    if type(settings.hudEnabled) ~= 'boolean' then
+        settings.hudEnabled = DEFAULT_HUD_SETTINGS.hudEnabled
         changed = true
     end
 
     local cinematicHeight = tonumber(settings.cinematicBarsHeight)
-    if not cinematicHeight then
-        cinematicHeight = DEFAULT_HUD_SETTINGS.cinematicBarsHeight
-        changed = true
-    end
-
+        or DEFAULT_HUD_SETTINGS.cinematicBarsHeight
     cinematicHeight = math.max(0, math.min(cinematicHeight, 25))
+
     if settings.cinematicBarsHeight ~= cinematicHeight then
         settings.cinematicBarsHeight = cinematicHeight
         changed = true
     end
 
-    if not VALID_PLAYER_STATUS_INDICATORS[settings.playerStatusIndicator] then
-        settings.playerStatusIndicator = DEFAULT_HUD_SETTINGS.playerStatusIndicator
+    if type(settings.player) ~= 'table' then
+        settings.player = deepCopy(DEFAULT_HUD_SETTINGS.player)
         changed = true
     end
 
-    if not VALID_PLAYER_HUD_POSITIONS[settings.playerHudPosition] then
-        settings.playerHudPosition = DEFAULT_HUD_SETTINGS.playerHudPosition
+    if not VALID_PLAYER_LAYOUTS[settings.player.layout] then
+        settings.player.layout = DEFAULT_HUD_SETTINGS.player.layout
         changed = true
     end
 
-    if not VALID_VEHICLE_HUD_STYLES[settings.vehicleHudStyle] then
-        settings.vehicleHudStyle = DEFAULT_HUD_SETTINGS.vehicleHudStyle
+    if not VALID_PLAYER_HUD_POSITIONS[settings.player.position] then
+        settings.player.position = DEFAULT_HUD_SETTINGS.player.position
         changed = true
     end
 
-    if not VALID_COMPASS_STYLES[settings.compassStyle] then
-        settings.compassStyle = DEFAULT_HUD_SETTINGS.compassStyle
+    local playerIndicators, playerIndicatorsChanged = validateIndicatorGroup(
+        settings.player.indicators,
+        DEFAULT_HUD_SETTINGS.player.indicators
+    )
+    settings.player.indicators = playerIndicators
+    changed = changed or playerIndicatorsChanged
+
+    if type(settings.vehicle) ~= 'table' then
+        settings.vehicle = deepCopy(DEFAULT_HUD_SETTINGS.vehicle)
         changed = true
     end
 
-    if not VALID_COMPASS_POSITIONS[settings.compassPosition] then
-        settings.compassPosition = DEFAULT_HUD_SETTINGS.compassPosition
+    if not VALID_VEHICLE_LAYOUTS[settings.vehicle.layout] then
+        settings.vehicle.layout = DEFAULT_HUD_SETTINGS.vehicle.layout
         changed = true
     end
 
-    if changed then
-        SaveHudSettings(settings)
+    if not VALID_VEHICLE_INDICATOR_LAYOUTS[settings.vehicle.indicatorLayout] then
+        settings.vehicle.indicatorLayout = DEFAULT_HUD_SETTINGS.vehicle.indicatorLayout
+        changed = true
     end
 
-    return settings
+    local vehicleIndicators, vehicleIndicatorsChanged = validateIndicatorGroup(
+        settings.vehicle.indicators,
+        DEFAULT_HUD_SETTINGS.vehicle.indicators
+    )
+    settings.vehicle.indicators = vehicleIndicators
+    changed = changed or vehicleIndicatorsChanged
+
+    if type(settings.compass) ~= 'table' then
+        settings.compass = deepCopy(DEFAULT_HUD_SETTINGS.compass)
+        changed = true
+    end
+
+    if not VALID_COMPASS_LAYOUTS[settings.compass.layout] then
+        settings.compass.layout = DEFAULT_HUD_SETTINGS.compass.layout
+        changed = true
+    end
+
+    if not VALID_COMPASS_POSITIONS[settings.compass.position] then
+        settings.compass.position = DEFAULT_HUD_SETTINGS.compass.position
+        changed = true
+    end
+
+    return settings, changed
 end
 
-local function saveHudSetting(key, value)
-    local settings = LoadHudSettings()
-    settings[key] = value
-    SaveHudSettings(settings)
+local function SaveHudSettings(settings)
+    if not HUD_SETTINGS_ENABLED then return end
+    SaveData(HUD_SETTINGS_KEY, settings)
 end
 
-local function disableHud(data)
-    if type(data) ~= 'table' then return false end
+local function LoadHudSettings()
+    local settings = createDefaultHudSettings()
 
-    local disabled = data.disabled
-    if disabled == nil then
-        disabled = data.enabled
+    if not HUD_SETTINGS_ENABLED then
+        return validateHudSettings(settings)
     end
 
-    if type(disabled) ~= 'boolean' then return false end
+    local savedSettings = LoadData(HUD_SETTINGS_KEY)
 
-    hudState.hudDisabled = disabled
-    hudState.isOpen = not disabled
-    saveHudSetting('hudDisabled', disabled)
+    if type(savedSettings) == 'table' then
+        settings.hudEnabled = savedSettings.hudEnabled
+        settings.cinematicBarsHeight = savedSettings.cinematicBarsHeight
+        settings.player = deepCopy(savedSettings.player)
+        settings.vehicle = deepCopy(savedSettings.vehicle)
+        settings.compass = deepCopy(savedSettings.compass)
+    end
 
-    if disabled then
+    local validatedSettings = validateHudSettings(settings)
+    SaveHudSettings(validatedSettings)
+
+    return validatedSettings
+end
+
+local function pushHudSettings()
+    if not activeHudSettings then return end
+
+    local payload = deepCopy(activeHudSettings)
+    payload.settingsEnabled = HUD_SETTINGS_ENABLED
+    sendNUIMessage('UPDATE_SETTINGS', payload)
+end
+
+local function saveActiveHudSettings()
+    if not activeHudSettings then return false end
+
+    local settings, changed = validateHudSettings(activeHudSettings)
+    activeHudSettings = settings
+    SaveHudSettings(activeHudSettings)
+    pushHudSettings()
+
+    return not changed
+end
+
+local function setHudEnabled(enabled)
+    if type(enabled) ~= 'boolean' then return false end
+
+    activeHudSettings.hudEnabled = enabled
+    hudState.hudDisabled = not enabled
+    hudState.isOpen = enabled
+    saveActiveHudSettings()
+
+    if not enabled then
         updatePlayerHud({ open = false })
         updateVehicleHud({ open = false })
         updateCompass({ open = false })
@@ -562,33 +726,26 @@ local function disableHud(data)
     return true
 end
 
-local function registerEnumSettingCallback(callbackName, settingKey, payloadKey, allowedValues)
-    RegisterNUICallback(callbackName, function(data, cb)
-        local value = type(data) == 'table' and data[payloadKey] or nil
+local function canEditHudSettings(cb)
+    if HUD_SETTINGS_ENABLED then return true end
 
-        if type(value) ~= 'string' or not allowedValues[value] then
-            cb({ status = 'error', message = ('Invalid %s'):format(settingKey) })
-            return
-        end
-
-        saveHudSetting(settingKey, value)
-        cb({ status = 'ok' })
-    end)
+    cb({ status = 'error', message = 'HUD settings are disabled by the server configuration' })
+    return false
 end
 
 local function initializeHud()
     Wait(500)
 
-    local hudSettings = LoadHudSettings()
+    activeHudSettings = LoadHudSettings()
 
-    hudState.hudDisabled = hudSettings.hudDisabled
-    hudState.cinematicBarsActive = hudSettings.cinematicBarsHeight > 0
-    hudState.isOpen = not hudSettings.hudDisabled
+    hudState.hudDisabled = not activeHudSettings.hudEnabled
+    hudState.cinematicBarsActive = activeHudSettings.cinematicBarsHeight > 0
+    hudState.isOpen = activeHudSettings.hudEnabled
 
-    sendNUIMessage('UPDATE_SETTINGS', hudSettings)
+    pushHudSettings()
 
     if config.debug then
-        lib.print.info(('HUD settings loaded: %s'):format(json.encode(hudSettings)))
+        lib.print.info(('HUD settings loaded: %s'):format(json.encode(activeHudSettings)))
     end
 
     SetupMinimap()
@@ -618,68 +775,212 @@ AddStateBagChangeHandler('proximity', ('player:%s'):format(cache.serverId), func
     voiceProximity = value.distance
 end)
 
-RegisterNUICallback('toggleCinematicBars', function(data, cb)
-    if type(data) ~= 'table' then
-        cb({ status = 'error', message = 'Missing cinematic settings' })
-        return
-    end
-
-    local enabled = data.enabled == true
-    local height = tonumber(data.height) or (enabled and 10 or 0)
-    height = math.max(0, math.min(height, 25))
-
-    data.enabled = enabled
-    data.height = height
-
-    saveHudSetting('cinematicBarsHeight', height)
-    onToggleCinematicBars(data, cb)
-end)
-
 RegisterNUICallback('closeSettings', onCloseSettings)
 
-RegisterNUICallback('setHudDisabled', function(data, cb)
-    if not disableHud(data) then
-        cb({ status = 'error', message = 'Invalid HUD visibility value' })
+RegisterNUICallback('setHudEnabled', function(data, cb)
+    if not canEditHudSettings(cb) then return end
+
+    local enabled = type(data) == 'table' and data.enabled or nil
+
+    if not setHudEnabled(enabled) then
+        cb({ status = 'error', message = 'Invalid HUD enabled value' })
         return
     end
 
     cb({ status = 'ok' })
 end)
 
-registerEnumSettingCallback(
-    'setPlayerStatusIndicator',
-    'playerStatusIndicator',
-    'style',
-    VALID_PLAYER_STATUS_INDICATORS
-)
+RegisterNUICallback('setCinematicBars', function(data, cb)
+    if not canEditHudSettings(cb) then return end
 
-registerEnumSettingCallback(
-    'setPlayerHudPosition',
-    'playerHudPosition',
-    'position',
-    VALID_PLAYER_HUD_POSITIONS
-)
+    local height = type(data) == 'table' and tonumber(data.height) or nil
 
-registerEnumSettingCallback(
-    'setVehicleHudStyle',
-    'vehicleHudStyle',
-    'style',
-    VALID_VEHICLE_HUD_STYLES
-)
+    if not height then
+        cb({ status = 'error', message = 'Invalid cinematic bar height' })
+        return
+    end
 
-registerEnumSettingCallback(
-    'setCompassStyle',
-    'compassStyle',
-    'style',
-    VALID_COMPASS_STYLES
-)
+    height = math.max(0, math.min(height, 25))
+    activeHudSettings.cinematicBarsHeight = height
+    saveActiveHudSettings()
 
-registerEnumSettingCallback(
-    'setCompassPosition',
-    'compassPosition',
-    'position',
-    VALID_COMPASS_POSITIONS
-)
+    onToggleCinematicBars({ enabled = height > 0, height = height }, function()
+        cb({ status = 'ok' })
+    end)
+end)
+
+RegisterNUICallback('setHudLayout', function(data, cb)
+    if not canEditHudSettings(cb) then return end
+    if type(data) ~= 'table' then
+        cb({ status = 'error', message = 'Missing layout data' })
+        return
+    end
+
+    local section = data.section
+    local layout = data.layout
+
+    if section == 'player' and VALID_PLAYER_LAYOUTS[layout] then
+        activeHudSettings.player.layout = layout
+    elseif section == 'vehicle' and VALID_VEHICLE_LAYOUTS[layout] then
+        activeHudSettings.vehicle.layout = layout
+    elseif section == 'compass' and VALID_COMPASS_LAYOUTS[layout] then
+        activeHudSettings.compass.layout = layout
+    else
+        cb({ status = 'error', message = 'Invalid HUD layout' })
+        return
+    end
+
+    saveActiveHudSettings()
+    cb({ status = 'ok' })
+end)
+
+RegisterNUICallback('setHudPosition', function(data, cb)
+    if not canEditHudSettings(cb) then return end
+    if type(data) ~= 'table' then
+        cb({ status = 'error', message = 'Missing position data' })
+        return
+    end
+
+    local section = data.section
+    local position = data.position
+
+    if section == 'player' and VALID_PLAYER_HUD_POSITIONS[position] then
+        activeHudSettings.player.position = position
+    elseif section == 'compass' and VALID_COMPASS_POSITIONS[position] then
+        activeHudSettings.compass.position = position
+    else
+        cb({ status = 'error', message = 'Invalid HUD position' })
+        return
+    end
+
+    saveActiveHudSettings()
+    cb({ status = 'ok' })
+end)
+
+RegisterNUICallback('setVehicleIndicatorLayout', function(data, cb)
+    if not canEditHudSettings(cb) then return end
+
+    local layout = type(data) == 'table' and data.layout or nil
+
+    if not VALID_VEHICLE_INDICATOR_LAYOUTS[layout] then
+        cb({ status = 'error', message = 'Invalid vehicle indicator layout' })
+        return
+    end
+
+    activeHudSettings.vehicle.indicatorLayout = layout
+    saveActiveHudSettings()
+    cb({ status = 'ok' })
+end)
+
+RegisterNUICallback('setIndicatorVisibility', function(data, cb)
+    if not canEditHudSettings(cb) then return end
+    if type(data) ~= 'table' then
+        cb({ status = 'error', message = 'Missing indicator data' })
+        return
+    end
+
+    local section = data.section
+    local indicator = data.indicator
+    local visibility = data.visibility
+    local sectionSettings = activeHudSettings[section]
+
+    if (section ~= 'player' and section ~= 'vehicle')
+        or type(sectionSettings) ~= 'table'
+        or type(sectionSettings.indicators) ~= 'table'
+        or type(sectionSettings.indicators[indicator]) ~= 'table'
+        or not VALID_INDICATOR_VISIBILITY[visibility]
+    then
+        cb({ status = 'error', message = 'Invalid indicator visibility' })
+        return
+    end
+
+    sectionSettings.indicators[indicator].visibility = visibility
+    saveActiveHudSettings()
+    cb({ status = 'ok' })
+end)
+
+RegisterNUICallback('setIndicatorColor', function(data, cb)
+    if not canEditHudSettings(cb) then return end
+    if type(data) ~= 'table' then
+        cb({ status = 'error', message = 'Missing indicator data' })
+        return
+    end
+
+    local section = data.section
+    local indicator = data.indicator
+    local color = data.color
+    local sectionSettings = activeHudSettings[section]
+
+    if (section ~= 'player' and section ~= 'vehicle')
+        or type(sectionSettings) ~= 'table'
+        or type(sectionSettings.indicators) ~= 'table'
+        or type(sectionSettings.indicators[indicator]) ~= 'table'
+        or type(sectionSettings.indicators[indicator].colors) == 'table'
+        or not VALID_INDICATOR_COLORS[color]
+    then
+        cb({ status = 'error', message = 'Invalid indicator color' })
+        return
+    end
+
+    sectionSettings.indicators[indicator].color = color
+    saveActiveHudSettings()
+    cb({ status = 'ok' })
+end)
+
+RegisterNUICallback('setVehicleIndicatorStateColor', function(data, cb)
+    if not canEditHudSettings(cb) then return end
+
+    if type(data) ~= 'table' then
+        cb({ status = 'error', message = 'Missing vehicle color data' })
+        return
+    end
+
+    local indicator = data.indicator
+    local state = data.state
+    local color = data.color
+    local setting = activeHudSettings.vehicle.indicators[indicator]
+    local defaultSetting = DEFAULT_HUD_SETTINGS.vehicle.indicators[indicator]
+
+    if type(setting) ~= 'table'
+        or type(setting.colors) ~= 'table'
+        or type(defaultSetting) ~= 'table'
+        or type(defaultSetting.colors) ~= 'table'
+        or defaultSetting.colors[state] == nil
+        or not VALID_INDICATOR_COLORS[color]
+    then
+        cb({ status = 'error', message = 'Invalid vehicle indicator state color' })
+        return
+    end
+
+    setting.colors[state] = color
+    saveActiveHudSettings()
+    cb({ status = 'ok' })
+end)
+
+RegisterNUICallback('setVoiceIndicatorColor', function(data, cb)
+    if not canEditHudSettings(cb) then return end
+    if type(data) ~= 'table' then
+        cb({ status = 'error', message = 'Missing voice color data' })
+        return
+    end
+
+    local state = data.state
+    local color = data.color
+    local voiceSetting = activeHudSettings.player.indicators.voice
+
+    if (state ~= 'inactive' and state ~= 'voice' and state ~= 'radio')
+        or not VALID_INDICATOR_COLORS[color]
+        or type(voiceSetting) ~= 'table'
+        or type(voiceSetting.colors) ~= 'table'
+    then
+        cb({ status = 'error', message = 'Invalid voice indicator color' })
+        return
+    end
+
+    voiceSetting.colors[state] = color
+    saveActiveHudSettings()
+    cb({ status = 'ok' })
+end)
 
 CreateThread(function()
     while true do
@@ -694,15 +995,17 @@ lib.onCache('vehicle', function(vehicle)
     handleVehicleLoop()
 end)
 
-lib.addKeybind({
-    name = 'settings',
-    description = 'Open Settings',
-    defaultMapper = 'keyboard',
-    default = 'I',
-    onPressed = function()
-        toggleSettings(true)
-    end
-})
+if HUD_SETTINGS_ENABLED then
+    lib.addKeybind({
+        name = 'settings',
+        description = 'Open HUD Settings',
+        defaultMapper = 'keyboard',
+        default = HUD_SETTINGS_CONFIG.keybind or 'I',
+        onPressed = function()
+            toggleSettings(true)
+        end
+    })
+end
 
 RegisterNetEvent('QBCore:Client:OnPlayerLoaded', initializeHud)
 

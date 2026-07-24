@@ -297,7 +297,7 @@ function SetupMinimap()
     return true
 end
 
-if config.dontTiltMinimap then
+if config.minimap.dontTiltMinimap then
     CreateThread(function()
         while true do
             Wait(0)
