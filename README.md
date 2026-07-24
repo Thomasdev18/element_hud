@@ -13,6 +13,15 @@
 </p>
 
 <p align="center">
+  <a href="https://discord.gg/2F9AgEVXtt">
+    <img
+      src="https://img.shields.io/badge/Join%20the%20Element%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white"
+      alt="Join the Element Discord"
+    />
+  </a>
+</p>
+
+<p align="center">
   <strong>Player HUD</strong> ·
   <strong>Vehicle HUD</strong> ·
   <strong>Helicopter HUD</strong> ·
