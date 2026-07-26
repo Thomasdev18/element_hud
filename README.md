@@ -94,6 +94,7 @@ This allows players to keep their HUD preferences after reconnecting or restarti
 | --- | --- |
 | QBox / `qbx_core` | Supported |
 | QBCore / `qb-core` | Supported |
+| ESX / `es_extended` | Supported |
 
 The resource automatically loads the appropriate framework bridge depending on which framework is running.
 
@@ -125,6 +126,7 @@ The nitrous integration is isolated and can easily be changed to support another
 - One of the supported frameworks:
   - `qbx_core`
   - `qb-core`
+  - `es_extended`
 - `ox_lib`
 - A compiled frontend build
 
@@ -178,6 +180,13 @@ ensure qb-core
 ensure element_hud
 ```
 
+For ESX:
+
+```cfg
+ensure ox_lib
+ensure es_extended
+ensure element_hud
+```
 
 The exact configuration structure may differ depending on the current version of the resource.
 
@@ -190,7 +199,8 @@ The framework-specific logic is separated into bridge modules.
 ```text
 bridge/
 ├── qb.lua
-└── qbx.lua
+├── qbx.lua
+└── esx.lua
 ```
 
 This keeps the main HUD logic framework-independent and makes it easier to add support for other frameworks later.
