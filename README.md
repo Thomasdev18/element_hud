@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  A modern and configurable HUD resource for FiveM, built for QBox and QBCore.
+  A modern and configurable HUD resource for FiveM, built for QBox, QBCore and ESX.
 </p>
 
 <p align="center">
